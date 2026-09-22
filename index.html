@@ -46,12 +46,20 @@ select,input[type=text]{min-height:46px;width:100%;border:1px solid var(--line);
 <div class="dice">
 <div class="diceTop"><div class="die" id="die">―</div><div><small class="muted">出目</small><div class="result" id="result">まだ振っていません</div><small class="muted" id="sub">6択を生成してからサイコロを振ります．</small></div></div>
 <div class="row"><button class="btn primary" id="roll" disabled>🎲 サイコロを振る</button><a class="btn" id="route" target="_blank" rel="noopener" style="display:none">経路を確認</a><button class="btn" id="arrived" disabled>この駅に到着</button></div>
+<div class="field" style="margin-top:16px">
+  <label for="destination">任意の行先</label>
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px">
+    <input id="destination" type="text" placeholder="例：津田沼">
+    <button class="btn" id="goManual" type="button">この行先へ</button>
+  </div>
+  <span class="muted" id="destinationHint" style="font-size:.78rem">帰宅したいときや，行きたい駅があるときにサイコロを上書きできます．フリーエリア外も指定できます．</span>
+</div>
 <div style="margin-top:12px"><small class="muted">実物のサイコロを使う場合</small><div class="manual" id="manual"></div></div>
 </div>
 <div class="note"><b>ルール：</b>「この駅に到着」を押すと現在地を更新し，次の6択を自動生成します．現在駅と直前の駅は候補から除外します．時刻・帰宅可否・運休は判定しません．</div>
 </section>
 </div>
-<footer>v0.2 ／ 2026-09-22時点の簡易データ．設定はブラウザのlocalStorageに保存します．</footer>
+<footer>v0.3 ／ 2026-09-22時点の簡易データ．設定はブラウザのlocalStorageに保存します．</footer>
 </div>
 <script>
 (function(){
@@ -88,7 +96,7 @@ nonbiri:{name:"のんびりホリデーSuicaパス",price:"2,850円",coverage:"�
 holiday:{name:"休日おでかけパス",price:"2,950円",coverage:"東京近郊JR＋りんかい線＋東京モノレール",source:"https://www.jreast.co.jp/tickets/info.aspx?GoodsCd=2490",stations:merge(wide,kururi,S("新幹線",["本庄早稲田"]))}
 };
 
-var $=function(id){return document.getElementById(id)},pass=$("pass"),info=$("ticketInfo"),current=$("current"),mode=$("mode"),sound=$("sound"),choicesEl=$("choices"),now=$("now"),nowPass=$("nowPass"),die=$("die"),result=$("result"),sub=$("sub"),rollBtn=$("roll"),route=$("route"),arrived=$("arrived");
+var $=function(id){return document.getElementById(id)},pass=$("pass"),info=$("ticketInfo"),current=$("current"),mode=$("mode"),sound=$("sound"),choicesEl=$("choices"),now=$("now"),nowPass=$("nowPass"),die=$("die"),result=$("result"),sub=$("sub"),rollBtn=$("roll"),route=$("route"),arrived=$("arrived"),destination=$("destination"),goManual=$("goManual"),destinationHint=$("destinationHint");
 var choices=[],winner=null,previous="",rolling=false,audio=null,key="diceTripV02";
 Object.keys(passes).forEach(function(id){var p=passes[id],o=document.createElement("option");o.value=id;o.textContent=p.name+"（"+p.price+"）";pass.appendChild(o)});
 
@@ -110,10 +118,33 @@ function ctx(){if(!sound.checked)return null;try{if(!audio)audio=new(window.Audi
 function tone(f,d,v,type){var c=ctx();if(!c)return;var o=c.createOscillator(),g=c.createGain(),n=c.currentTime;o.type=type||"square";o.frequency.value=f;g.gain.setValueAtTime(v||.02,n);g.gain.exponentialRampToValueAtTime(.0001,n+d);o.connect(g);g.connect(c.destination);o.start(n);o.stop(n+d)}
 function wait(ms){return new Promise(function(r){setTimeout(r,ms)})}
 async function roll(){if(rolling||choices.length!==6)return;rolling=true;rollBtn.disabled=true;arrived.disabled=true;route.style.display="none";winner=null;rollBtn.textContent="🎲 振っています…";result.textContent="運命のサイコロ…";sub.textContent="行き先を決めています．";die.classList.add("rolling");var final=rnd(6),ds=[55,55,60,65,70,75,85,95,110,130,150,180],last=-1;for(var k=0;k<ds.length;k++){var t=rnd(6);if(t===last)t=(t+1+rnd(5))%6;last=t;die.textContent=String(t+1);preview(t);tone(330+t*55,.035,.012,"square");await wait(ds[k])}die.classList.remove("rolling");select(final,true);tone(720,.09,.035,"triangle");setTimeout(function(){tone(980,.13,.03,"triangle")},95);rollBtn.textContent="🎲 サイコロを振る";rollBtn.disabled=false;rolling=false}
-function arrive(){if(!winner||rolling)return;previous=current.value.trim();current.value=winner.name;now.textContent=winner.name;save();generate()}
+function manualDestination(){
+  if(rolling)return;
+  var name=destination.value.trim();
+  if(!name)return;
+  var p=passes[pass.value];
+  var covered=p.stations.some(function(s){return s.name===name});
+  winner={name:name,region:covered?"任意指定・フリーエリア登録済み":"任意指定・範囲未確認"};
+  die.textContent="★";
+  die.classList.remove("rolling","landed");
+  void die.offsetWidth;
+  die.classList.add("landed");
+  choicesEl.querySelectorAll(".choice").forEach(function(x){x.classList.remove("winner","preview");x.classList.add("dim")});
+  result.textContent=name+"へ";
+  result.classList.remove("reveal");
+  void result.offsetWidth;
+  result.classList.add("reveal");
+  sub.textContent=covered?"任意指定した行先です．選択中のきっぷの登録候補内です．":"任意指定した行先です．フリーエリア内か，追加運賃が必要かを確認してください．";
+  destinationHint.textContent=covered?"選択中のきっぷの登録候補内です．":"フリーエリア外または本サイト未登録の駅です．実際の利用条件を確認してください．";
+  route.href=maps(name);
+  route.style.display="inline-flex";
+  arrived.disabled=false;
+  tone(660,.08,.03,"triangle");
+}
+function arrive(){if(!winner||rolling)return;previous=current.value.trim();current.value=winner.name;now.textContent=winner.name;destination.value="";destinationHint.textContent="帰宅したいときや，行きたい駅があるときにサイコロを上書きできます．フリーエリア外も指定できます．";save();generate()}
 
 $("newSet").onclick=generate;$("reset").onclick=function(){if(rolling)return;previous="";current.value="津田沼";pass.value="holiday";mode.value="balanced";sound.checked=false;choices=[];winner=null;choicesEl.innerHTML="";now.textContent="津田沼";updateTicket();resetResult();rollBtn.disabled=true;localStorage.removeItem(key);save()};
-rollBtn.onclick=roll;arrived.onclick=arrive;pass.onchange=function(){if(rolling)return;updateTicket();choices=[];choicesEl.innerHTML="";resetResult();rollBtn.disabled=true};mode.onchange=save;sound.onchange=save;current.onchange=function(){now.textContent=current.value.trim()||"未設定";save()};
+rollBtn.onclick=roll;arrived.onclick=arrive;goManual.onclick=manualDestination;destination.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();manualDestination()}});pass.onchange=function(){if(rolling)return;updateTicket();choices=[];choicesEl.innerHTML="";resetResult();rollBtn.disabled=true};mode.onchange=save;sound.onchange=save;current.onchange=function(){now.textContent=current.value.trim()||"未設定";save()};
 for(var i=0;i<6;i++){(function(n){var b=document.createElement("button");b.className="btn";b.textContent=String(n+1);b.onclick=function(){if(!rolling&&choices.length===6){select(n,true);tone(720,.07,.028,"triangle")}};$("manual").appendChild(b)})(i)}
 load();updateTicket();now.textContent=current.value.trim()||"未設定";generate();
 })();
