@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>サイコロの旅</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--text:#17202a;--muted:#667085;--line:#d9dee5;--accent:#1d4ed8;--soft:#eaf0ff}
+@media(prefers-color-scheme:dark){:root{--bg:#111418;--card:#1a1f25;--text:#f3f4f6;--muted:#aeb6c2;--line:#333a44;--accent:#7aa2ff;--soft:#1f315c}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI","Noto Sans JP","Yu Gothic UI",sans-serif;line-height:1.55}
+button,input,select{font:inherit}button{cursor:pointer}.wrap{max-width:980px;margin:auto;padding:20px 14px 48px}h1{margin:0;font-size:clamp(1.8rem,5vw,2.5rem)}.lead,.muted{color:var(--muted)}.lead{margin:4px 0 18px}
+.grid{display:grid;grid-template-columns:1fr 1.35fr;gap:14px;align-items:start}@media(max-width:760px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px}.field{display:grid;gap:6px;margin-top:12px}label{font-size:.88rem;font-weight:700}
+select,input[type=text]{min-height:46px;width:100%;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--text);padding:0 12px}
+.info{margin-top:10px;padding:11px;border-radius:12px;background:var(--soft);font-size:.88rem}.info p{margin:3px 0}.pill{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:1px 7px;margin-left:6px;font-size:.74rem}
+.row{display:flex;flex-wrap:wrap;gap:9px;margin-top:14px}.btn{min-height:44px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--text);padding:9px 14px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}.btn:disabled{opacity:.45;cursor:not-allowed}
+.status{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:12px}.stat{border:1px solid var(--line);border-radius:12px;padding:10px}.stat small{color:var(--muted)}.stat b{display:block;overflow-wrap:anywhere}
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:9px}@media(max-width:540px){.choices{grid-template-columns:1fr}}
+.choice{border:1px solid var(--line);border-radius:13px;padding:10px;display:grid;grid-template-columns:40px 1fr;gap:9px;transition:.16s}.choice.preview,.choice.winner{border-color:var(--accent);background:var(--soft);transform:translateY(-1px)}.choice.winner{border-width:2px;transform:scale(1.015)}.choice.dim{opacity:.5}.num{width:40px;height:40px;border:1px solid var(--line);border-radius:10px;display:grid;place-items:center;font-weight:850;font-size:1.1rem}.name{font-weight:800}.meta{font-size:.76rem;color:var(--muted)}.choice a{font-size:.78rem;color:var(--accent);text-decoration:none}
+.dice{margin-top:14px;border-top:1px solid var(--line);padding-top:14px}.diceTop{display:grid;grid-template-columns:86px 1fr;gap:14px;align-items:center}.die{width:86px;height:86px;border:2px solid var(--line);border-radius:20px;display:grid;place-items:center;font-size:2.3rem;font-weight:900;user-select:none}.die.rolling{border-color:var(--accent);animation:shake .28s linear infinite}.die.landed{animation:land .48s ease}.result{font-size:1.25rem;font-weight:850}.reveal{animation:reveal .45s ease}
+@keyframes shake{0%,100%{transform:none}20%{transform:translate(-3px,2px) rotate(-8deg) scale(1.05)}40%{transform:translate(3px,-2px) rotate(7deg)}60%{transform:translate(-2px,-2px) rotate(-5deg) scale(1.04)}80%{transform:translate(2px,2px) rotate(5deg)}}
+@keyframes land{45%{transform:scale(1.18) rotate(5deg)}70%{transform:scale(.96) rotate(-2deg)}}@keyframes reveal{from{opacity:.2;transform:translateY(8px)}to{opacity:1;transform:none}}
+.manual{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:7px}.manual button{min-height:40px}.switch{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px}.switch input{width:20px;height:20px}
+.note{margin-top:14px;border-left:4px solid var(--accent);background:var(--soft);padding:10px 12px;border-radius:8px;font-size:.84rem}footer{margin-top:16px;color:var(--muted);font-size:.76rem}
+@media(prefers-reduced-motion:reduce){.die.rolling,.die.landed,.reveal{animation:none}.choice{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>🎲 サイコロの旅</h1>
+<p class="lead">フリーきっぷを選び，移動するたびに次の6駅を抽選します．</p>
+<div class="grid">
+<section class="card">
+<h2>旅の設定</h2>
+<div class="field"><label for="pass">使うフリーきっぷ</label><select id="pass"></select></div>
+<div class="info" id="ticketInfo"></div>
+<div class="field"><label for="current">現在地</label><input id="current" type="text" value="津田沼"><span class="muted" style="font-size:.78rem">フリーエリア外からの往復は判定しません．</span></div>
+<div class="field"><label for="mode">候補の選び方</label><select id="mode"><option value="balanced">エリア分散</option><option value="uniform">完全ランダム</option></select></div>
+<div class="switch"><span><b>効果音</b><br><small class="muted">サイコロ演出中に短い音を鳴らす</small></span><input id="sound" type="checkbox"></div>
+<div class="row"><button class="btn primary" id="newSet">6択を生成</button><button class="btn" id="reset">旅をリセット</button></div>
+</section>
+<section class="card">
+<div class="status"><div class="stat"><small>現在地</small><b id="now">津田沼</b></div><div class="stat"><small>使用きっぷ</small><b id="nowPass">―</b></div></div>
+<h2>次の6択</h2><div class="choices" id="choices"></div>
+<div class="dice">
+<div class="diceTop"><div class="die" id="die">―</div><div><small class="muted">出目</small><div class="result" id="result">まだ振っていません</div><small class="muted" id="sub">6択を生成してからサイコロを振ります．</small></div></div>
+<div class="row"><button class="btn primary" id="roll" disabled>🎲 サイコロを振る</button><a class="btn" id="route" target="_blank" rel="noopener" style="display:none">経路を確認</a><button class="btn" id="arrived" disabled>この駅に到着</button></div>
+<div style="margin-top:12px"><small class="muted">実物のサイコロを使う場合</small><div class="manual" id="manual"></div></div>
+</div>
+<div class="note"><b>ルール：</b>「この駅に到着」を押すと現在地を更新し，次の6択を自動生成します．現在駅と直前の駅は候補から除外します．時刻・帰宅可否・運休は判定しません．</div>
+</section>
+</div>
+<footer>v0.2 ／ 2026-09-22時点の簡易データ．設定はブラウザのlocalStorageに保存します．</footer>
+</div>
+<script>
+(function(){
+"use strict";
+function S(region,names){return names.map(function(name){return{name:name,region:region}})}
+function merge(){var m=new Map();Array.from(arguments).flat().forEach(function(x){m.set(x.name,x)});return Array.from(m.values())}
+
+var jr=merge(
+S("JR都区内",["東京","神田","秋葉原","御徒町","上野","鶯谷","日暮里","西日暮里","田端","駒込","巣鴨","大塚","池袋","目白","高田馬場","新大久保","新宿","代々木","原宿","渋谷","恵比寿","目黒","五反田","大崎","品川","高輪ゲートウェイ","田町","浜松町","新橋","有楽町"]),
+S("JR都区内",["赤羽","東十条","王子","上中里","大井町","大森","蒲田","御茶ノ水","四ツ谷","中野","高円寺","阿佐ケ谷","荻窪","西荻窪","東中野","大久保","千駄ケ谷","信濃町","市ケ谷","飯田橋","水道橋","浅草橋","両国","錦糸町","亀戸","平井","新小岩","小岩"]),
+S("JR都区内",["新日本橋","馬喰町","西大井","尾久","三河島","南千住","北千住","綾瀬","亀有","金町","板橋","十条","北赤羽","浮間舟渡","八丁堀","越中島","潮見","新木場","葛西臨海公園"])
+);
+var metro=S("東京メトロ",["浅草","上野","秋葉原","北千住","中目黒","銀座","新橋","渋谷","荻窪","方南町","池袋","新宿","新宿三丁目","四ツ谷","東京","大手町","後楽園","中野","高田馬場","早稲田","飯田橋","九段下","門前仲町","木場","東陽町","南砂町","西葛西","葛西","浦安","南行徳","行徳","妙典","原木中山","西船橋","北綾瀬","綾瀬","町屋","西日暮里","千駄木","根津","湯島","赤坂","乃木坂","表参道","明治神宮前〈原宿〉","代々木上原","和光市","地下鉄成増","地下鉄赤塚","平和台","氷川台","小竹向原","千川","要町","東池袋","護国寺","江戸川橋","市ケ谷","永田町","有楽町","新富町","月島","豊洲","辰巳","新木場","半蔵門","神保町","水天宮前","清澄白河","住吉","錦糸町","押上〈スカイツリー前〉","目黒","白金台","白金高輪","麻布十番","六本木一丁目","東大前","本駒込","駒込","西ケ原","王子","王子神谷","志茂","赤羽岩淵","雑司が谷","西早稲田","東新宿","北参道"]);
+var toei=S("都営地下鉄",["西馬込","五反田","泉岳寺","三田","大門","東銀座","日本橋","人形町","浅草橋","蔵前","浅草","押上","目黒","白金台","白金高輪","芝公園","御成門","日比谷","大手町","神保町","水道橋","春日","巣鴨","西巣鴨","高島平","西高島平","新宿","新宿三丁目","市ケ谷","九段下","小川町","岩本町","馬喰横山","浜町","森下","菊川","住吉","西大島","大島","東大島","船堀","一之江","瑞江","篠崎","本八幡","都庁前","新宿西口","東新宿","飯田橋","本郷三丁目","上野御徒町","新御徒町","両国","清澄白河","門前仲町","月島","勝どき","汐留","麻布十番","六本木","青山一丁目","国立競技場","代々木","中野坂上","東中野","練馬","豊島園","光が丘"]);
+var tram=S("都電・舎人",["三ノ輪橋","町屋駅前","熊野前","荒川遊園地前","王子駅前","飛鳥山","大塚駅前","東池袋四丁目","鬼子母神前","早稲田","日暮里","西日暮里","足立小台","扇大橋","江北","舎人公園","見沼代親水公園"]);
+var mono=S("東京モノレール",["浜松町","天王洲アイル","大井競馬場前","流通センター","昭和島","整備場","天空橋","羽田空港第3ターミナル","新整備場","羽田空港第1ターミナル","羽田空港第2ターミナル"]);
+var rinkai=S("りんかい線",["新木場","東雲","国際展示場","東京テレポート","天王洲アイル","品川シーサイド","大井町","大崎"]);
+var wide=merge(jr,
+S("神奈川",["川崎","鶴見","浜川崎","海芝浦","武蔵小杉","新川崎","横浜","桜木町","石川町","大船","北鎌倉","鎌倉","逗子","横須賀","久里浜","戸塚","藤沢","茅ケ崎","平塚","二宮","国府津","小田原","橋本","相模原","町田"]),
+S("多摩・山梨",["吉祥寺","三鷹","国分寺","立川","八王子","高尾","相模湖","上野原","大月","拝島","青梅","御嶽","奥多摩","武蔵五日市"]),
+S("埼玉",["川口","浦和","さいたま新都心","大宮","武蔵浦和","南浦和","川越","高麗川","越生","寄居","上尾","鴻巣","熊谷","籠原","本庄","神保原"]),
+S("北関東",["久喜","栗橋","古河","小山","自治医大","佐野","足利","下館"]),
+S("茨城",["柏","我孫子","取手","牛久","ひたち野うしく","荒川沖","土浦"]),
+S("千葉",["市川","船橋","津田沼","西船橋","南船橋","新浦安","海浜幕張","蘇我","千葉","四街道","佐倉","成田","空港第2ビル","成田空港","八街","成東","鎌取","誉田","土気","大網","茂原","五井","袖ケ浦","木更津","君津"]),
+mono,rinkai);
+var kururi=S("久留里線",["祇園","上総清川","横田","馬来田","小櫃","俵田","久留里","平山","上総松丘","上総亀山"]);
+
+var passes={
+tokunai:{name:"都区内パス",price:"870円",coverage:"東京23区内のJR線",source:"https://www.jreast.co.jp/suica/ic_otoku/",stations:jr},
+metro24:{name:"東京メトロ24時間券",price:"700円",coverage:"東京メトロ全9路線",source:"https://www.tokyometro.jp/ticket/value/1day/",stations:metro},
+subway:{name:"東京メトロ・都営地下鉄共通1日乗車券",price:"1,100円",coverage:"東京メトロ＋都営地下鉄",source:"https://www.kotsu.metro.tokyo.jp/subway/fare/otoku_metro_1day.html",stations:merge(metro,toei)},
+tokyoFree:{name:"東京フリーきっぷ",price:"1,720円",coverage:"JR都区内＋東京メトロ＋都営交通",source:"https://www.kotsu.metro.tokyo.jp/bus/fare/otoku_free.html",stations:merge(jr,metro,toei,tram)},
+nonbiri:{name:"のんびりホリデーSuicaパス",price:"2,850円",coverage:"東京近郊JR＋りんかい線＋東京モノレール",source:"https://www.jreast.co.jp/tickets/info.aspx?GoodsCd=2682",stations:wide},
+holiday:{name:"休日おでかけパス",price:"2,950円",coverage:"東京近郊JR＋りんかい線＋東京モノレール",source:"https://www.jreast.co.jp/tickets/info.aspx?GoodsCd=2490",stations:merge(wide,kururi,S("新幹線",["本庄早稲田"]))}
+};
+
+var $=function(id){return document.getElementById(id)},pass=$("pass"),info=$("ticketInfo"),current=$("current"),mode=$("mode"),sound=$("sound"),choicesEl=$("choices"),now=$("now"),nowPass=$("nowPass"),die=$("die"),result=$("result"),sub=$("sub"),rollBtn=$("roll"),route=$("route"),arrived=$("arrived");
+var choices=[],winner=null,previous="",rolling=false,audio=null,key="diceTripV02";
+Object.keys(passes).forEach(function(id){var p=passes[id],o=document.createElement("option");o.value=id;o.textContent=p.name+"（"+p.price+"）";pass.appendChild(o)});
+
+function save(){localStorage.setItem(key,JSON.stringify({pass:pass.value,current:current.value.trim(),previous:previous,mode:mode.value,sound:sound.checked}))}
+function load(){try{var s=JSON.parse(localStorage.getItem(key)||"{}");pass.value=passes[s.pass]?s.pass:"holiday";if(s.current)current.value=s.current;previous=s.previous||"";mode.value=s.mode==="uniform"?"uniform":"balanced";sound.checked=!!s.sound}catch(e){pass.value="holiday"}}
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]})}
+function updateTicket(){var p=passes[pass.value];info.innerHTML="<p><b>"+esc(p.name)+"</b><span class='pill'>"+esc(p.price)+"</span></p><p>"+esc(p.coverage)+"</p><p class='muted'>登録候補 "+p.stations.length+"駅・停留場 ／ <a href='"+p.source+"' target='_blank' rel='noopener'>公式情報 ↗</a></p>";nowPass.textContent=p.name;save()}
+function rnd(n){if(n<=1)return 0;var a=new Uint32Array(1),lim=0x100000000-(0x100000000%n);do{crypto.getRandomValues(a)}while(a[0]>=lim);return a[0]%n}
+function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=rnd(i+1),t=a[i];a[i]=a[j];a[j]=t}return a}
+function uniform(pool){return shuffle(pool).slice(0,6)}
+function balanced(pool){var m=new Map();pool.forEach(function(s){if(!m.has(s.region))m.set(s.region,[]);m.get(s.region).push(s)});var rs=shuffle(Array.from(m.keys())),out=[];rs.forEach(function(r){if(out.length<6){var b=m.get(r);out.push(b[rnd(b.length)])}});if(out.length<6){var used=new Set(out.map(function(x){return x.name}));out=out.concat(uniform(pool.filter(function(x){return!used.has(x.name)})).slice(0,6-out.length))}return shuffle(out)}
+function maps(dest){var q=new URLSearchParams({api:"1",origin:current.value.trim()+"駅",destination:dest+"駅",travelmode:"transit"});return"https://www.google.com/maps/dir/?"+q.toString()}
+function render(){choicesEl.innerHTML="";choices.forEach(function(s,i){var d=document.createElement("div");d.className="choice";d.dataset.i=i;d.innerHTML="<div class='num'>"+(i+1)+"</div><div><div class='name'>"+esc(s.name)+"</div><div class='meta'>"+esc(s.region||"")+"</div><a href='"+maps(s.name)+"' target='_blank' rel='noopener'>この駅への経路を見る ↗</a></div>";choicesEl.appendChild(d)})}
+function resetResult(){die.textContent="―";die.className="die";result.textContent="まだ振っていません";result.className="result";sub.textContent="6択を生成してからサイコロを振ります．";route.style.display="none";arrived.disabled=true;choicesEl.querySelectorAll(".choice").forEach(function(x){x.className="choice"})}
+function generate(){if(rolling)return;var p=passes[pass.value],ex=new Set([current.value.trim(),previous].filter(Boolean)),pool=p.stations.filter(function(s){return!ex.has(s.name)});if(pool.length<6)return;choices=mode.value==="balanced"?balanced(pool):uniform(pool);winner=null;render();resetResult();rollBtn.disabled=false;now.textContent=current.value.trim()||"未設定";updateTicket()}
+function preview(i){choicesEl.querySelectorAll(".choice").forEach(function(x,j){x.classList.toggle("preview",i===j);x.classList.remove("winner","dim")})}
+function select(i,anim){if(choices.length!==6)return;winner=choices[i];die.textContent=String(i+1);choicesEl.querySelectorAll(".choice").forEach(function(x,j){x.classList.toggle("winner",i===j);x.classList.toggle("dim",i!==j);x.classList.remove("preview")});result.textContent=winner.name+"へ";sub.textContent=(winner.region||"フリーエリア内")+"．次の目的地が決まりました．";route.href=maps(winner.name);route.style.display="inline-flex";arrived.disabled=false;if(anim){die.classList.remove("landed");result.classList.remove("reveal");void die.offsetWidth;die.classList.add("landed");result.classList.add("reveal")}}
+function ctx(){if(!sound.checked)return null;try{if(!audio)audio=new(window.AudioContext||window.webkitAudioContext)();if(audio.state==="suspended")audio.resume();return audio}catch(e){return null}}
+function tone(f,d,v,type){var c=ctx();if(!c)return;var o=c.createOscillator(),g=c.createGain(),n=c.currentTime;o.type=type||"square";o.frequency.value=f;g.gain.setValueAtTime(v||.02,n);g.gain.exponentialRampToValueAtTime(.0001,n+d);o.connect(g);g.connect(c.destination);o.start(n);o.stop(n+d)}
+function wait(ms){return new Promise(function(r){setTimeout(r,ms)})}
+async function roll(){if(rolling||choices.length!==6)return;rolling=true;rollBtn.disabled=true;arrived.disabled=true;route.style.display="none";winner=null;rollBtn.textContent="🎲 振っています…";result.textContent="運命のサイコロ…";sub.textContent="行き先を決めています．";die.classList.add("rolling");var final=rnd(6),ds=[55,55,60,65,70,75,85,95,110,130,150,180],last=-1;for(var k=0;k<ds.length;k++){var t=rnd(6);if(t===last)t=(t+1+rnd(5))%6;last=t;die.textContent=String(t+1);preview(t);tone(330+t*55,.035,.012,"square");await wait(ds[k])}die.classList.remove("rolling");select(final,true);tone(720,.09,.035,"triangle");setTimeout(function(){tone(980,.13,.03,"triangle")},95);rollBtn.textContent="🎲 サイコロを振る";rollBtn.disabled=false;rolling=false}
+function arrive(){if(!winner||rolling)return;previous=current.value.trim();current.value=winner.name;now.textContent=winner.name;save();generate()}
+
+$("newSet").onclick=generate;$("reset").onclick=function(){if(rolling)return;previous="";current.value="津田沼";pass.value="holiday";mode.value="balanced";sound.checked=false;choices=[];winner=null;choicesEl.innerHTML="";now.textContent="津田沼";updateTicket();resetResult();rollBtn.disabled=true;localStorage.removeItem(key);save()};
+rollBtn.onclick=roll;arrived.onclick=arrive;pass.onchange=function(){if(rolling)return;updateTicket();choices=[];choicesEl.innerHTML="";resetResult();rollBtn.disabled=true};mode.onchange=save;sound.onchange=save;current.onchange=function(){now.textContent=current.value.trim()||"未設定";save()};
+for(var i=0;i<6;i++){(function(n){var b=document.createElement("button");b.className="btn";b.textContent=String(n+1);b.onclick=function(){if(!rolling&&choices.length===6){select(n,true);tone(720,.07,.028,"triangle")}};$("manual").appendChild(b)})(i)}
+load();updateTicket();now.textContent=current.value.trim()||"未設定";generate();
+})();
+</script>
+</body>
+</html>
